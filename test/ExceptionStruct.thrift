@@ -17,7 +17,7 @@
  * under the License.
  */
 
-namespace test.ExceptionStruct
+namespace * test.ExceptionStruct
 
 enum ErrorCode {
   GenericError,
@@ -26,13 +26,13 @@ enum ErrorCode {
 }
 
 struct GetRequest {
-  1: string id;
-  2: binary data     # some arbitrary data
+  1: string id
+  2: binary data     // some arbitrary data
 }
 
 struct GetResponse {
   1: i32 job_nr
-  2: binary data     # some arbitrary data
+  2: binary data     // some arbitrary data
 }
 
 struct BatchGetRequest {

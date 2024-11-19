@@ -41,6 +41,7 @@ uses
   Thrift.WinHTTP,
   Thrift.TypeRegistry,
   System_,
+  test.ExceptionStruct,
   DebugProtoTest;
 
 {$TYPEINFO ON}
@@ -82,8 +83,10 @@ type
     procedure Test_Serializer_Deserializer;
     procedure Test_COM_Types;
     procedure Test_ThriftBytesCTORs;
-    procedure Test_OneOfEach(     const method : TMethod; const factory : TFactoryPair; const stream : TFileStream);
-    procedure Test_CompactStruct( const method : TMethod; const factory : TFactoryPair; const stream : TFileStream);
+
+    procedure Test_OneOfEach(       const method : TMethod; const factory : TFactoryPair; const stream : TFileStream);
+    procedure Test_CompactStruct(   const method : TMethod; const factory : TFactoryPair; const stream : TFileStream);
+    procedure Test_ExceptionStruct( const method : TMethod; const factory : TFactoryPair; const stream : TFileStream);
 
   public
     constructor Create;
@@ -100,6 +103,7 @@ function CreateOneOfEach : IOneOfEach; stdcall; external SERIALIZERDATA_DLL;
 function CreateNesting : INesting; stdcall; external SERIALIZERDATA_DLL;
 function CreateHolyMoley : IHolyMoley; stdcall; external SERIALIZERDATA_DLL;
 function CreateCompactProtoTestStruct : ICompactProtoTestStruct; stdcall; external SERIALIZERDATA_DLL;
+function CreateBatchGetResponse : IBatchGetResponse; stdcall; external SERIALIZERDATA_DLL;
 
 
 { TTestSerializer }
@@ -266,6 +270,42 @@ begin
 end;
 
 
+procedure TTestSerializer.Test_ExceptionStruct( const method : TMethod; const factory : TFactoryPair; const stream : TFileStream);
+var tested, correct : IBatchGetResponse;
+    bytes   : TBytes;
+begin
+  // write
+  tested := CreateBatchGetResponse;
+  case method of
+    mt_Bytes:  bytes := Serialize( tested, factory);
+    mt_Stream: begin
+      stream.Size := 0;
+      Serialize( tested, factory, stream);
+    end
+  else
+    ASSERT( FALSE);
+  end;
+
+  // init + read
+  correct := TBatchGetResponseImpl.Create;
+  case method of
+    mt_Bytes:  Deserialize( bytes, tested, factory);
+    mt_Stream: begin
+      stream.Position := 0;
+      Deserialize( stream, tested, factory);
+    end
+  else
+    ASSERT( FALSE);
+  end;
+
+  // check
+  correct := CreateCompactProtoTestStruct;
+  ASSERT( correct.Field500  = tested.Field500);
+  ASSERT( correct.Field5000  = tested.Field5000);
+  ASSERT( correct.Field20000 = tested.Field20000);
+end;
+
+
 procedure TTestSerializer.Test_Serializer_Deserializer;
 var factory : TFactoryPair;
     stream  : TFileStream;
@@ -279,8 +319,9 @@ begin
       for factory in FProtocols do begin
         Writeln('- '+UserFriendlyName(factory));
 
-        Test_OneOfEach(     method, factory, stream);
-        Test_CompactStruct( method, factory, stream);
+        Test_OneOfEach(       method, factory, stream);
+        Test_CompactStruct(   method, factory, stream);
+        Test_ExceptionStruct( method, factory, stream);
       end;
 
       Writeln;
@@ -348,6 +389,7 @@ begin
     Test_Serializer_Deserializer;
     Test_COM_Types;
     Test_ThriftBytesCTORs;
+    Test_ExceptionStructs;
   except
     on e:Exception do begin
       Writeln( e.ClassName+': '+ e.Message);

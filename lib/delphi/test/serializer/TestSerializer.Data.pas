@@ -27,6 +27,7 @@ uses
   ComObj,
   Thrift.Protocol,
   Thrift.Collections,
+  test.TestSerializer,
   DebugProtoTest;
 
 
@@ -37,6 +38,7 @@ type
     class function CreateNesting : INesting;
     class function CreateHolyMoley : IHolyMoley;
     class function CreateCompactProtoTestStruct : ICompactProtoTestStruct;
+    class function CreateBatchGetResponse : IBatchGetResponse;
 
   // These byte arrays are serialized versions of the above structs.
   // They were serialized in binary protocol using thrift 0.6.x and are used to
@@ -359,6 +361,11 @@ begin
 end;
 
 
+class function Fixtures.CreateBatchGetResponse : IBatchGetResponse;
+begin
+  result := TBatchGetResponseImpl.Create;
+  x
+end;
 
 
 end.

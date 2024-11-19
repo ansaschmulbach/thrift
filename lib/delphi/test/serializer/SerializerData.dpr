@@ -69,11 +69,18 @@ begin
 end;
 
 
+function CreateBatchGetResponse : IBatchGetResponse; stdcall;
+begin
+  result := Fixtures.CreateBatchGetResponse;
+end;
+
+
 exports
   CreateOneOfEach,
   CreateNesting,
   CreateHolyMoley,
-  CreateCompactProtoTestStruct;
+  CreateCompactProtoTestStruct,
+  CreateBatchGetResponse;
 
 begin
   IsMultiThread := TRUE;
