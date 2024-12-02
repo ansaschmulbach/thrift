@@ -411,6 +411,7 @@ void t_cpp_generator::init_generator() {
 
   // Include base types
   f_types_ << "#include <iosfwd>" << endl
+	   << "#include <iostream>" << endl
            << endl
            << "#include <thrift/Thrift.h>" << endl
            << "#include <thrift/TApplicationException.h>" << endl
