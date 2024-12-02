@@ -3934,6 +3934,7 @@ void t_cpp_generator::generate_serialize_field(ostream& out,
                                                t_field* tfield,
                                                string prefix,
                                                string suffix) {
+  out << "std::cout << \"hi\";" << endl;
   t_type* type = get_true_type(tfield->get_type());
 
   string name = prefix + tfield->get_name() + suffix;
