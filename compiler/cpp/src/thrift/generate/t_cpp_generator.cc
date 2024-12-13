@@ -411,13 +411,13 @@ void t_cpp_generator::init_generator() {
 
   // Include base types
   f_types_ << "#include <iosfwd>" << endl
-	   << "#include <iostream>" << endl
            << endl
            << "#include <thrift/Thrift.h>" << endl
            << "#include <thrift/TApplicationException.h>" << endl
            << "#include <thrift/TBase.h>" << endl
            << "#include <thrift/protocol/TProtocol.h>" << endl
            << "#include <thrift/transport/TTransport.h>" << endl
+	   << "#include <thrift/protocol/TBinaryProtocol.h>" << endl
            << endl;
   // Include C++xx compatibility header
   f_types_ << "#include <thrift/stdcxx.h>" << endl;
@@ -2283,11 +2283,11 @@ void t_cpp_generator::generate_service_client(t_service* tservice, string style)
   indent_up();
   if (style != "Cob") {
     f_header_ << indent() << service_name_ << style << "Client" << short_suffix << "(" << prot_ptr
-              << " prot) ";
+              << " prot," << "apache::thrift::stdcxx::shared_ptr<::apache::thrift::protocol::TProtocol> bprot) ";
 
     if (extends.empty()) {
       f_header_ << "{" << endl;
-      f_header_ << indent() << "  setProtocol" << short_suffix << "(prot);" << endl << indent()
+      f_header_ << indent() << "  setProtocol" << short_suffix << "(prot, bprot);" << endl << indent()
                 << "}" << endl;
     } else {
       f_header_ << ":" << endl;
@@ -2296,10 +2296,10 @@ void t_cpp_generator::generate_service_client(t_service* tservice, string style)
     }
 
     f_header_ << indent() << service_name_ << style << "Client" << short_suffix << "(" << prot_ptr
-              << " iprot, " << prot_ptr << " oprot) ";
+              << " iprot, " << prot_ptr << " oprot," << "apache::thrift::stdcxx::shared_ptr<::apache::thrift::protocol::TProtocol> bprot) ";
     if (extends.empty()) {
       f_header_ << "{" << endl;
-      f_header_ << indent() << "  setProtocol" << short_suffix << "(iprot,oprot);" << endl
+      f_header_ << indent() << "  setProtocol" << short_suffix << "(iprot,oprot,bprot);" << endl
                 << indent() << "}" << endl;
     } else {
       f_header_ << ":" << indent() << "  " << extends << style << client_suffix
@@ -2310,17 +2310,19 @@ void t_cpp_generator::generate_service_client(t_service* tservice, string style)
     if (extends.empty()) {
       f_header_ << " private:" << endl;
       // 1: one parameter
-      f_header_ << indent() << "void setProtocol" << short_suffix << "(" << prot_ptr << " prot) {"
+      f_header_ << indent() << "void setProtocol" << short_suffix << "(" << prot_ptr << " prot, apache::thrift::stdcxx::shared_ptr<::apache::thrift::protocol::TProtocol> bprot) {"
                 << endl;
-      f_header_ << indent() << "setProtocol" << short_suffix << "(prot,prot);" << endl;
+      f_header_ << indent() << "setProtocol" << short_suffix << "(prot,prot,bprot);" << endl;
       f_header_ << indent() << "}" << endl;
       // 2: two parameter
       f_header_ << indent() << "void setProtocol" << short_suffix << "(" << prot_ptr << " iprot, "
-                << prot_ptr << " oprot) {" << endl;
+                << prot_ptr << " oprot, apache::thrift::stdcxx::shared_ptr<::apache::thrift::protocol::TProtocol> bprot) {" << endl;
 
       f_header_ << indent() << "  piprot_=iprot;" << endl << indent() << "  poprot_=oprot;" << endl
                 << indent() << "  iprot_ = iprot.get();" << endl << indent()
-                << "  oprot_ = oprot.get();" << endl;
+                << "  oprot_ = oprot.get();" << endl
+		<< indent() << "  pbprot_=bprot;" << endl << indent()
+		<< "  binaryProt_ = bprot.get();" << endl;
 
       f_header_ << indent() << "}" << endl;
       f_header_ << " public:" << endl;
@@ -2438,7 +2440,9 @@ void t_cpp_generator::generate_service_client(t_service* tservice, string style)
       indent() << prot_ptr << " piprot_;" << endl <<
       indent() << prot_ptr << " poprot_;" << endl <<
       indent() << protocol_type << "* iprot_;" << endl <<
-      indent() << protocol_type << "* oprot_;" << endl;
+      indent() << protocol_type << "* oprot_;" << endl <<
+      indent() << "apache::thrift::stdcxx::shared_ptr< ::apache::thrift::protocol::TProtocol> pbprot_;" << endl <<
+      indent() << "::apache::thrift::protocol::TProtocol* binaryProt_;" << endl;
 
     if (style == "Concurrent") {
       f_header_ <<
@@ -2569,6 +2573,13 @@ void t_cpp_generator::generate_service_client(t_service* tservice, string style)
         ", cseqid);" << endl << endl <<
         indent() << argsname << " args;" << endl;
 
+      out <<
+        indent() << _this << "binaryProt_->writeMessageBegin(\"" <<
+        (*f_iter)->get_name() <<
+        "\", ::apache::thrift::protocol::" << ((*f_iter)->is_oneway() ? "T_ONEWAY" : "T_CALL") <<
+        ", cseqid);" << endl << endl <<
+        indent() << argsname << " args;" << endl;
+
       for (fld_iter = fields.begin(); fld_iter != fields.end(); ++fld_iter) {
         out << indent() << "args." << (*fld_iter)->get_name() << " = &" << (*fld_iter)->get_name()
             << ";" << endl;
@@ -2578,6 +2589,11 @@ void t_cpp_generator::generate_service_client(t_service* tservice, string style)
           << "oprot_->writeMessageEnd();" << endl << indent() << _this
           << "oprot_->getTransport()->writeEnd();" << endl << indent() << _this
           << "oprot_->getTransport()->flush();" << endl;
+
+      out << indent() << "args.write(" << _this << "binaryProt_);" << endl << endl << indent() << _this
+          << "binaryProt_->writeMessageEnd();" << endl << indent() << _this
+          << "binaryProt_->getTransport()->writeEnd();" << endl << indent() << _this
+          << "binaryProt_->getTransport()->flush();" << endl;
 
       if (style == "Concurrent") {
         out << endl << indent() << "sentry.commit();" << endl;
@@ -2946,6 +2962,9 @@ void ProcessorGenerator::generate_class_definition() {
   f_header_ << " private:" << endl;
   indent_up();
 
+  f_header_ << indent() << "::apache::thrift::protocol::TBinaryProtocol* _binaryProt;" << endl;
+  f_header_ << indent() << "::apache::thrift::stdcxx::shared_ptr<::apache::thrift::protocol::TBinaryProtocol> _binaryProtocol;" << endl;
+
   // Declare processMap_
   f_header_ << indent() << "typedef  void (" << class_name_ << "::*"
             << "ProcessFunction)(" << finish_cob_decl_ << "int32_t, "
@@ -3009,13 +3028,15 @@ void ProcessorGenerator::generate_class_definition() {
   }
 
   f_header_ << " public:" << endl << indent() << class_name_ << "(::apache::thrift::stdcxx::shared_ptr<" << if_name_
-            << "> iface) :" << endl;
+            << "> iface, " << "::apache::thrift::stdcxx::shared_ptr<::apache::thrift::protocol::TBinaryProtocol> bprot) :" << endl;
   if (!extends_.empty()) {
     f_header_ << indent() << "  " << extends_ << "(iface)," << endl;
   }
   f_header_ << indent() << "  iface_(iface) {" << endl;
   indent_up();
 
+  f_header_ << indent() << "_binaryProtocol = bprot;" << endl;
+  f_header_ << indent() << "_binaryProt = _binaryProtocol.get();" << endl;
   for (f_iter = functions.begin(); f_iter != functions.end(); ++f_iter) {
     f_header_ << indent() << "processMap_[\"" << (*f_iter)->get_name() << "\"] = ";
     if (generator_->gen_templates_) {
@@ -3370,9 +3391,14 @@ void t_cpp_generator::generate_process_function(t_service* tservice,
       out << endl << indent() << "::apache::thrift::TApplicationException x(e.what());" << endl
           << indent() << "oprot->writeMessageBegin(\"" << tfunction->get_name()
           << "\", ::apache::thrift::protocol::T_EXCEPTION, seqid);" << endl << indent()
+          << indent() << "_binaryProt->writeMessageBegin(\"" << tfunction->get_name()
+          << "\", ::apache::thrift::protocol::T_EXCEPTION, seqid);" << endl << indent()
           << "x.write(oprot);" << endl << indent() << "oprot->writeMessageEnd();" << endl
+          << "x.write(_binaryProt);" << endl << indent() << "_binaryProt->writeMessageEnd();" << endl
           << indent() << "oprot->getTransport()->writeEnd();" << endl << indent()
-          << "oprot->getTransport()->flush();" << endl;
+          << indent() << "_binaryProt->getTransport()->writeEnd();" << endl << indent()
+          << "oprot->getTransport()->flush();" << endl
+          << "_binaryProt->getTransport()->flush();" << endl;
     }
     out << indent() << "return;" << endl;
     indent_down();
@@ -3391,11 +3417,17 @@ void t_cpp_generator::generate_process_function(t_service* tservice,
     // Serialize the result into a struct
     out << indent() << "if (this->eventHandler_.get() != NULL) {" << endl << indent()
         << "  this->eventHandler_->preWrite(ctx, " << service_func_name << ");" << endl << indent()
-        << "}" << endl << endl << indent() << "oprot->writeMessageBegin(\"" << tfunction->get_name()
+        << "}" << endl << endl 
+	<< indent() << "oprot->writeMessageBegin(\"" << tfunction->get_name()
+        << "\", ::apache::thrift::protocol::T_REPLY, seqid);" << endl 
+	<< indent() << "_binaryProt->writeMessageBegin(\"" << tfunction->get_name()
         << "\", ::apache::thrift::protocol::T_REPLY, seqid);" << endl << indent()
         << "result.write(oprot);" << endl << indent() << "oprot->writeMessageEnd();" << endl
+        << "result.write(_binaryProt);" << endl << indent() << "_binaryProt->writeMessageEnd();" << endl
         << indent() << "bytes = oprot->getTransport()->writeEnd();" << endl << indent()
+        << indent() << "bytes = _binaryProt->getTransport()->writeEnd();" << endl << indent()
         << "oprot->getTransport()->flush();" << endl << endl << indent()
+        << "_binaryProt->getTransport()->flush();" << endl << endl << indent()
         << "if (this->eventHandler_.get() != NULL) {" << endl << indent()
         << "  this->eventHandler_->postWrite(ctx, " << service_func_name << ", bytes);" << endl
         << indent() << "}" << endl;
@@ -3935,7 +3967,6 @@ void t_cpp_generator::generate_serialize_field(ostream& out,
                                                t_field* tfield,
                                                string prefix,
                                                string suffix) {
-  out << "std::cout << \"hi\";" << endl;
   t_type* type = get_true_type(tfield->get_type());
 
   string name = prefix + tfield->get_name() + suffix;
