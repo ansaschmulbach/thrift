@@ -32,6 +32,15 @@
 #include <iostream>
 #include <stdexcept>
 #include <sstream>
+#include <string>
+#include <cstring>
+#include <fcntl.h>
+#include <cstddef>
+
+#include <thrift/protocol/TBinaryProtocol.h>
+#include <thrift/transport/TBufferTransports.h>
+#include <thrift/transport/TFDTransport.h>
+#include <thrift/transport/TTransportException.h>
 
 #include "../gen-cpp/Calculator.h"
 
@@ -130,12 +139,40 @@ class CalculatorCloneFactory : virtual public CalculatorIfFactory {
   }
 };
 
+std::shared_ptr<::apache::thrift::transport::TBufferedTransport>  openFileTransport(const char* name, bool out) {
+	int fd;
+	if (out) {
+		fd = open(name, O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR | S_IXUSR);
+	} else {
+		fd = open(name, O_RDONLY);
+	}
+	if (-1 == fd)
+	{
+		printf("ERROR: Open/create for write failed!\n");
+		return nullptr;
+	}
+
+	std::shared_ptr<::apache::thrift::transport::TFDTransport> file(new ::apache::thrift::transport::TFDTransport(fd));
+	std::shared_ptr<::apache::thrift::transport::TBufferedTransport> transport(new ::apache::thrift::transport::TBufferedTransport(file));
+	return transport;
+}
+
 int main() {
+
+	std::shared_ptr<::apache::thrift::transport::TBufferedTransport> traceT = openFileTransport("server_trace", true);
+	if (!traceT) {
+		return -1;
+	}
+	std::shared_ptr<::apache::thrift::protocol::TBinaryProtocol> trace(new ::apache::thrift::protocol::TBinaryProtocol(traceT));
+	traceT.get()->open();
+
   TThreadedServer server(
-    stdcxx::make_shared<CalculatorProcessorFactory>(stdcxx::make_shared<CalculatorCloneFactory>()),
+    stdcxx::make_shared<CalculatorProcessorFactory>(stdcxx::make_shared<CalculatorCloneFactory>(), trace),
     stdcxx::make_shared<TServerSocket>(9090), //port
     stdcxx::make_shared<TBufferedTransportFactory>(),
     stdcxx::make_shared<TBinaryProtocolFactory>());
+
+	traceT.get()->close();
 
   /*
   // if you don't need per-connection state, do the following instead

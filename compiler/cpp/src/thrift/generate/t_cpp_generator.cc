@@ -2570,10 +2570,7 @@ void t_cpp_generator::generate_service_client(t_service* tservice, string style)
         indent() << _this << "oprot_->writeMessageBegin(\"" <<
         (*f_iter)->get_name() <<
         "\", ::apache::thrift::protocol::" << ((*f_iter)->is_oneway() ? "T_ONEWAY" : "T_CALL") <<
-        ", cseqid);" << endl << endl <<
-        indent() << argsname << " args;" << endl;
-
-      out <<
+        ", cseqid);" << endl <<
         indent() << _this << "binaryProt_->writeMessageBegin(\"" <<
         (*f_iter)->get_name() <<
         "\", ::apache::thrift::protocol::" << ((*f_iter)->is_oneway() ? "T_ONEWAY" : "T_CALL") <<
@@ -3030,7 +3027,7 @@ void ProcessorGenerator::generate_class_definition() {
   f_header_ << " public:" << endl << indent() << class_name_ << "(::apache::thrift::stdcxx::shared_ptr<" << if_name_
             << "> iface, " << "::apache::thrift::stdcxx::shared_ptr<::apache::thrift::protocol::TBinaryProtocol> bprot) :" << endl;
   if (!extends_.empty()) {
-    f_header_ << indent() << "  " << extends_ << "(iface)," << endl;
+    f_header_ << indent() << "  " << extends_ << "(iface, bprot)," << endl;
   }
   f_header_ << indent() << "  iface_(iface) {" << endl;
   indent_up();
@@ -3168,8 +3165,9 @@ void ProcessorGenerator::generate_factory() {
   indent_up();
 
   f_header_ << indent() << factory_class_name_ << "(const ::apache::thrift::stdcxx::shared_ptr< " << if_factory_name
-            << " >& handlerFactory) :" << endl << indent()
-            << "    handlerFactory_(handlerFactory) {}" << endl << endl << indent()
+            << " >& handlerFactory, apache::thrift::stdcxx::shared_ptr<apache::thrift::protocol::TBinaryProtocol> bprot) :" << endl << indent()
+            << "    handlerFactory_(handlerFactory), bprot_(bprot) {}" << endl << endl << indent()
+	    << "apache::thrift::stdcxx::shared_ptr<apache::thrift::protocol::TBinaryProtocol> bprot_;" << endl << indent()
             << "::apache::thrift::stdcxx::shared_ptr< ::apache::thrift::"
             << (style_ == "Cob" ? "async::TAsyncProcessor" : "TProcessor") << " > "
             << "getProcessor(const ::apache::thrift::TConnectionInfo& connInfo);" << endl;
@@ -3201,7 +3199,7 @@ void ProcessorGenerator::generate_factory() {
          << "handlerFactory_->getHandler(connInfo), cleanup);" << endl << indent()
          << "::apache::thrift::stdcxx::shared_ptr< ::apache::thrift::"
          << (style_ == "Cob" ? "async::TAsyncProcessor" : "TProcessor") << " > "
-         << "processor(new " << class_name_ << template_suffix_ << "(handler));" << endl << indent()
+         << "processor(new " << class_name_ << template_suffix_ << "(handler, bprot_));" << endl << indent()
          << "return processor;" << endl;
 
   indent_down();

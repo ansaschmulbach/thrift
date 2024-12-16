@@ -18,8 +18,14 @@
  */
 
 #include <iostream>
+#include <string>
+#include <cstring>
+#include <fcntl.h>
+#include <cstddef>
 
 #include <thrift/protocol/TBinaryProtocol.h>
+#include <thrift/transport/TBufferTransports.h>
+#include <thrift/transport/TFDTransport.h>
 #include <thrift/transport/TSocket.h>
 #include <thrift/transport/TTransportUtils.h>
 #include <thrift/stdcxx.h>
@@ -34,14 +40,40 @@ using namespace apache::thrift::transport;
 using namespace tutorial;
 using namespace shared;
 
+std::shared_ptr<::apache::thrift::transport::TBufferedTransport>  openFileTransport(const char* name, bool out) {
+	int fd;
+	if (out) {
+		fd = open(name, O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR | S_IXUSR);
+	} else {
+		fd = open(name, O_RDONLY);
+	}
+	if (-1 == fd)
+	{
+		printf("ERROR: Open/create for write failed!\n");
+		return nullptr;
+	}
+
+	std::shared_ptr<::apache::thrift::transport::TFDTransport> file(new ::apache::thrift::transport::TFDTransport(fd));
+	std::shared_ptr<::apache::thrift::transport::TBufferedTransport> transport(new ::apache::thrift::transport::TBufferedTransport(file));
+	return transport;
+}
+
 int main() {
   stdcxx::shared_ptr<TTransport> socket(new TSocket("localhost", 9090));
   stdcxx::shared_ptr<TTransport> transport(new TBufferedTransport(socket));
   stdcxx::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
-  CalculatorClient client(protocol);
+
+	std::shared_ptr<::apache::thrift::transport::TBufferedTransport> traceT = openFileTransport("client_trace", true);
+	if (!traceT) {
+		return -1;
+	}
+	std::shared_ptr<::apache::thrift::protocol::TBinaryProtocol> trace(new ::apache::thrift::protocol::TBinaryProtocol(traceT));
+
+  CalculatorClient client(protocol, trace);
 
   try {
     transport->open();
+		traceT.get()->open();
 
     client.ping();
     cout << "ping()" << endl;
@@ -74,6 +106,7 @@ int main() {
     client.getStruct(ss, 1);
     cout << "Received log: " << ss << endl;
 
+		traceT.get()->close();
     transport->close();
   } catch (TException& tx) {
     cout << "ERROR: " << tx.what() << endl;
