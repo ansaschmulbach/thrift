@@ -417,7 +417,6 @@ void t_cpp_generator::init_generator() {
            << "#include <thrift/TBase.h>" << endl
            << "#include <thrift/protocol/TProtocol.h>" << endl
            << "#include <thrift/transport/TTransport.h>" << endl
-	   << "#include <thrift/protocol/TBinaryProtocol.h>" << endl
            << endl;
   // Include C++xx compatibility header
   f_types_ << "#include <thrift/stdcxx.h>" << endl;
@@ -2081,7 +2080,6 @@ void t_cpp_generator::generate_service_async_skeleton(t_service* tservice) {
              << "// filename to avoid overwriting it and rewrite as asynchronous any functions"
              << endl << "// that would otherwise introduce unwanted latency." << endl << endl
              << "#include \"" << get_include_prefix(*get_program()) << svcname << ".h\"" << endl
-             << "#include <thrift/protocol/TBinaryProtocol.h>" << endl << endl
              << "using namespace ::apache::thrift;" << endl
              << "using namespace ::apache::thrift::protocol;" << endl
              << "using namespace ::apache::thrift::transport;" << endl
@@ -2283,11 +2281,11 @@ void t_cpp_generator::generate_service_client(t_service* tservice, string style)
   indent_up();
   if (style != "Cob") {
     f_header_ << indent() << service_name_ << style << "Client" << short_suffix << "(" << prot_ptr
-              << " prot," << "apache::thrift::stdcxx::shared_ptr<::apache::thrift::protocol::TProtocol> bprot) ";
+              << " prot," << "apache::thrift::stdcxx::shared_ptr<::apache::thrift::protocol::TProtocol> tprot) ";
 
     if (extends.empty()) {
       f_header_ << "{" << endl;
-      f_header_ << indent() << "  setProtocol" << short_suffix << "(prot, bprot);" << endl << indent()
+      f_header_ << indent() << "  setProtocol" << short_suffix << "(prot, tprot);" << endl << indent()
                 << "}" << endl;
     } else {
       f_header_ << ":" << endl;
@@ -2296,10 +2294,10 @@ void t_cpp_generator::generate_service_client(t_service* tservice, string style)
     }
 
     f_header_ << indent() << service_name_ << style << "Client" << short_suffix << "(" << prot_ptr
-              << " iprot, " << prot_ptr << " oprot," << "apache::thrift::stdcxx::shared_ptr<::apache::thrift::protocol::TProtocol> bprot) ";
+              << " iprot, " << prot_ptr << " oprot," << "apache::thrift::stdcxx::shared_ptr<::apache::thrift::protocol::TProtocol> tprot) ";
     if (extends.empty()) {
       f_header_ << "{" << endl;
-      f_header_ << indent() << "  setProtocol" << short_suffix << "(iprot,oprot,bprot);" << endl
+      f_header_ << indent() << "  setProtocol" << short_suffix << "(iprot,oprot,tprot);" << endl
                 << indent() << "}" << endl;
     } else {
       f_header_ << ":" << indent() << "  " << extends << style << client_suffix
@@ -2310,19 +2308,19 @@ void t_cpp_generator::generate_service_client(t_service* tservice, string style)
     if (extends.empty()) {
       f_header_ << " private:" << endl;
       // 1: one parameter
-      f_header_ << indent() << "void setProtocol" << short_suffix << "(" << prot_ptr << " prot, apache::thrift::stdcxx::shared_ptr<::apache::thrift::protocol::TProtocol> bprot) {"
+      f_header_ << indent() << "void setProtocol" << short_suffix << "(" << prot_ptr << " prot, apache::thrift::stdcxx::shared_ptr<::apache::thrift::protocol::TProtocol> tprot) {"
                 << endl;
-      f_header_ << indent() << "setProtocol" << short_suffix << "(prot,prot,bprot);" << endl;
+      f_header_ << indent() << "setProtocol" << short_suffix << "(prot,prot,tprot);" << endl;
       f_header_ << indent() << "}" << endl;
       // 2: two parameter
       f_header_ << indent() << "void setProtocol" << short_suffix << "(" << prot_ptr << " iprot, "
-                << prot_ptr << " oprot, apache::thrift::stdcxx::shared_ptr<::apache::thrift::protocol::TProtocol> bprot) {" << endl;
+                << prot_ptr << " oprot, apache::thrift::stdcxx::shared_ptr<::apache::thrift::protocol::TProtocol> tprot) {" << endl;
 
       f_header_ << indent() << "  piprot_=iprot;" << endl << indent() << "  poprot_=oprot;" << endl
                 << indent() << "  iprot_ = iprot.get();" << endl << indent()
                 << "  oprot_ = oprot.get();" << endl
-		<< indent() << "  pbprot_=bprot;" << endl << indent()
-		<< "  binaryProt_ = bprot.get();" << endl;
+		<< indent() << "  ptprot_=tprot;" << endl << indent()
+		<< "  traceProt_ = tprot.get();" << endl;
 
       f_header_ << indent() << "}" << endl;
       f_header_ << " public:" << endl;
@@ -2441,8 +2439,8 @@ void t_cpp_generator::generate_service_client(t_service* tservice, string style)
       indent() << prot_ptr << " poprot_;" << endl <<
       indent() << protocol_type << "* iprot_;" << endl <<
       indent() << protocol_type << "* oprot_;" << endl <<
-      indent() << "apache::thrift::stdcxx::shared_ptr< ::apache::thrift::protocol::TProtocol> pbprot_;" << endl <<
-      indent() << "::apache::thrift::protocol::TProtocol* binaryProt_;" << endl;
+      indent() << "apache::thrift::stdcxx::shared_ptr< ::apache::thrift::protocol::TProtocol> ptprot_;" << endl <<
+      indent() << "::apache::thrift::protocol::TProtocol* traceProt_;" << endl;
 
     if (style == "Concurrent") {
       f_header_ <<
@@ -2571,7 +2569,7 @@ void t_cpp_generator::generate_service_client(t_service* tservice, string style)
         (*f_iter)->get_name() <<
         "\", ::apache::thrift::protocol::" << ((*f_iter)->is_oneway() ? "T_ONEWAY" : "T_CALL") <<
         ", cseqid);" << endl <<
-        indent() << _this << "binaryProt_->writeMessageBegin(\"" <<
+        indent() << _this << "traceProt_->writeMessageBegin(\"" <<
         (*f_iter)->get_name() <<
         "\", ::apache::thrift::protocol::" << ((*f_iter)->is_oneway() ? "T_ONEWAY" : "T_CALL") <<
         ", cseqid);" << endl << endl <<
@@ -2587,10 +2585,10 @@ void t_cpp_generator::generate_service_client(t_service* tservice, string style)
           << "oprot_->getTransport()->writeEnd();" << endl << indent() << _this
           << "oprot_->getTransport()->flush();" << endl;
 
-      out << indent() << "args.write(" << _this << "binaryProt_);" << endl << endl << indent() << _this
-          << "binaryProt_->writeMessageEnd();" << endl << indent() << _this
-          << "binaryProt_->getTransport()->writeEnd();" << endl << indent() << _this
-          << "binaryProt_->getTransport()->flush();" << endl;
+      out << indent() << "args.write(" << _this << "traceProt_);" << endl << endl << indent() << _this
+          << "traceProt_->writeMessageEnd();" << endl << indent() << _this
+          << "traceProt_->getTransport()->writeEnd();" << endl << indent() << _this
+          << "traceProt_->getTransport()->flush();" << endl;
 
       if (style == "Concurrent") {
         out << endl << indent() << "sentry.commit();" << endl;
@@ -2959,8 +2957,8 @@ void ProcessorGenerator::generate_class_definition() {
   f_header_ << " private:" << endl;
   indent_up();
 
-  f_header_ << indent() << "::apache::thrift::protocol::TBinaryProtocol* _binaryProt;" << endl;
-  f_header_ << indent() << "::apache::thrift::stdcxx::shared_ptr<::apache::thrift::protocol::TBinaryProtocol> _binaryProtocol;" << endl;
+  f_header_ << indent() << "::apache::thrift::protocol::TProtocol* _traceProt;" << endl;
+  f_header_ << indent() << "::apache::thrift::stdcxx::shared_ptr<::apache::thrift::protocol::TProtocol> _traceProtocol;" << endl;
 
   // Declare processMap_
   f_header_ << indent() << "typedef  void (" << class_name_ << "::*"
@@ -3025,15 +3023,15 @@ void ProcessorGenerator::generate_class_definition() {
   }
 
   f_header_ << " public:" << endl << indent() << class_name_ << "(::apache::thrift::stdcxx::shared_ptr<" << if_name_
-            << "> iface, " << "::apache::thrift::stdcxx::shared_ptr<::apache::thrift::protocol::TBinaryProtocol> bprot) :" << endl;
+            << "> iface, " << "::apache::thrift::stdcxx::shared_ptr<::apache::thrift::protocol::TProtocol> tprot) :" << endl;
   if (!extends_.empty()) {
-    f_header_ << indent() << "  " << extends_ << "(iface, bprot)," << endl;
+    f_header_ << indent() << "  " << extends_ << "(iface, tprot)," << endl;
   }
   f_header_ << indent() << "  iface_(iface) {" << endl;
   indent_up();
 
-  f_header_ << indent() << "_binaryProtocol = bprot;" << endl;
-  f_header_ << indent() << "_binaryProt = _binaryProtocol.get();" << endl;
+  f_header_ << indent() << "_traceProtocol = tprot;" << endl;
+  f_header_ << indent() << "_traceProt = _traceProtocol.get();" << endl;
   for (f_iter = functions.begin(); f_iter != functions.end(); ++f_iter) {
     f_header_ << indent() << "processMap_[\"" << (*f_iter)->get_name() << "\"] = ";
     if (generator_->gen_templates_) {
@@ -3165,9 +3163,9 @@ void ProcessorGenerator::generate_factory() {
   indent_up();
 
   f_header_ << indent() << factory_class_name_ << "(const ::apache::thrift::stdcxx::shared_ptr< " << if_factory_name
-            << " >& handlerFactory, apache::thrift::stdcxx::shared_ptr<apache::thrift::protocol::TBinaryProtocol> bprot) :" << endl << indent()
-            << "    handlerFactory_(handlerFactory), bprot_(bprot) {}" << endl << endl << indent()
-	    << "apache::thrift::stdcxx::shared_ptr<apache::thrift::protocol::TBinaryProtocol> bprot_;" << endl << indent()
+            << " >& handlerFactory, apache::thrift::stdcxx::shared_ptr<apache::thrift::protocol::TProtocol> tprot) :" << endl << indent()
+            << "    handlerFactory_(handlerFactory), tprot_(tprot) {}" << endl << endl << indent()
+	    << "apache::thrift::stdcxx::shared_ptr<apache::thrift::protocol::TProtocol> tprot_;" << endl << indent()
             << "::apache::thrift::stdcxx::shared_ptr< ::apache::thrift::"
             << (style_ == "Cob" ? "async::TAsyncProcessor" : "TProcessor") << " > "
             << "getProcessor(const ::apache::thrift::TConnectionInfo& connInfo);" << endl;
@@ -3199,7 +3197,7 @@ void ProcessorGenerator::generate_factory() {
          << "handlerFactory_->getHandler(connInfo), cleanup);" << endl << indent()
          << "::apache::thrift::stdcxx::shared_ptr< ::apache::thrift::"
          << (style_ == "Cob" ? "async::TAsyncProcessor" : "TProcessor") << " > "
-         << "processor(new " << class_name_ << template_suffix_ << "(handler, bprot_));" << endl << indent()
+         << "processor(new " << class_name_ << template_suffix_ << "(handler, tprot_));" << endl << indent()
          << "return processor;" << endl;
 
   indent_down();
@@ -3389,14 +3387,14 @@ void t_cpp_generator::generate_process_function(t_service* tservice,
       out << endl << indent() << "::apache::thrift::TApplicationException x(e.what());" << endl
           << indent() << "oprot->writeMessageBegin(\"" << tfunction->get_name()
           << "\", ::apache::thrift::protocol::T_EXCEPTION, seqid);" << endl << indent()
-          << indent() << "_binaryProt->writeMessageBegin(\"" << tfunction->get_name()
+          << indent() << "_traceProt->writeMessageBegin(\"" << tfunction->get_name()
           << "\", ::apache::thrift::protocol::T_EXCEPTION, seqid);" << endl << indent()
           << "x.write(oprot);" << endl << indent() << "oprot->writeMessageEnd();" << endl
-          << "x.write(_binaryProt);" << endl << indent() << "_binaryProt->writeMessageEnd();" << endl
+          << "x.write(_traceProt);" << endl << indent() << "_traceProt->writeMessageEnd();" << endl
           << indent() << "oprot->getTransport()->writeEnd();" << endl << indent()
-          << indent() << "_binaryProt->getTransport()->writeEnd();" << endl << indent()
+          << indent() << "_traceProt->getTransport()->writeEnd();" << endl << indent()
           << "oprot->getTransport()->flush();" << endl
-          << "_binaryProt->getTransport()->flush();" << endl;
+          << "_traceProt->getTransport()->flush();" << endl;
     }
     out << indent() << "return;" << endl;
     indent_down();
@@ -3418,14 +3416,14 @@ void t_cpp_generator::generate_process_function(t_service* tservice,
         << "}" << endl << endl 
 	<< indent() << "oprot->writeMessageBegin(\"" << tfunction->get_name()
         << "\", ::apache::thrift::protocol::T_REPLY, seqid);" << endl 
-	<< indent() << "_binaryProt->writeMessageBegin(\"" << tfunction->get_name()
+	<< indent() << "_traceProt->writeMessageBegin(\"" << tfunction->get_name()
         << "\", ::apache::thrift::protocol::T_REPLY, seqid);" << endl << indent()
         << "result.write(oprot);" << endl << indent() << "oprot->writeMessageEnd();" << endl
-        << "result.write(_binaryProt);" << endl << indent() << "_binaryProt->writeMessageEnd();" << endl
+        << "result.write(_traceProt);" << endl << indent() << "_traceProt->writeMessageEnd();" << endl
         << indent() << "bytes = oprot->getTransport()->writeEnd();" << endl << indent()
-        << indent() << "bytes = _binaryProt->getTransport()->writeEnd();" << endl << indent()
+        << indent() << "bytes = _traceProt->getTransport()->writeEnd();" << endl << indent()
         << "oprot->getTransport()->flush();" << endl << endl << indent()
-        << "_binaryProt->getTransport()->flush();" << endl << endl << indent()
+        << "_traceProt->getTransport()->flush();" << endl << endl << indent()
         << "if (this->eventHandler_.get() != NULL) {" << endl << indent()
         << "  this->eventHandler_->postWrite(ctx, " << service_func_name << ", bytes);" << endl
         << indent() << "}" << endl;
@@ -3701,7 +3699,6 @@ void t_cpp_generator::generate_service_skeleton(t_service* tservice) {
   f_skeleton << "// This autogenerated skeleton file illustrates how to build a server." << endl
              << "// You should copy it to another filename to avoid overwriting it." << endl << endl
              << "#include \"" << get_include_prefix(*get_program()) << svcname << ".h\"" << endl
-             << "#include <thrift/protocol/TBinaryProtocol.h>" << endl
              << "#include <thrift/server/TSimpleServer.h>" << endl
              << "#include <thrift/transport/TServerSocket.h>" << endl
              << "#include <thrift/transport/TBufferTransports.h>" << endl << endl
